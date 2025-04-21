@@ -104,13 +104,34 @@ class ProcessCenterApp:
         else:
             tkmb.showinfo("알림", "프로세스를 선택해주세요.")
 
-def run_headless(pid):
+def run_headless(pid, window_index=None, first=False):
     """GUI 없이 특정 PID의 창을 선택하여 중앙으로 이동합니다."""
     try:
         pid_int = int(pid)
         windows = win_utils.get_process_windows(pid_int)
         if windows:
-            if len(windows) > 1:
+            if first:
+                if window_index is not None:
+                    print("오류: -f 옵션과 -w 옵션은 동시에 사용할 수 없습니다.")
+                    sys.exit(1)
+                elif len(windows) > 0:
+                    selected_hwnd = windows[0]
+                    win_utils.center_window(selected_hwnd)
+                    print(f"PID {pid}의 첫 번째 창 (HWND: {hex(selected_hwnd)})을 중앙으로 이동했습니다.")
+                else:
+                    print(f"PID {pid}에 해당하는 창이 없습니다.")
+            elif window_index is not None:
+                try:
+                    index = int(window_index)
+                    if 0 <= index < len(windows):
+                        selected_hwnd = windows[index]
+                        win_utils.center_window(selected_hwnd)
+                        print(f"PID {pid}의 {index}번째 창 (HWND: {hex(selected_hwnd)})을 중앙으로 이동했습니다.")
+                    else:
+                        print(f"오류: 유효하지 않은 창 인덱스 ({index}). 0부터 {len(windows) - 1} 사이의 값을 입력해주세요.")
+                except ValueError:
+                    print("오류: --window 인자는 정수여야 합니다.")
+            elif len(windows) > 1:
                 windows_with_text = win_utils.get_window_texts_from_hwnd_list(windows)
                 print(f"PID {pid}에 대해 여러 개의 창이 발견되었습니다. 번호를 선택하세요:")
                 for i, (hwnd, text) in enumerate(windows_with_text):
@@ -144,12 +165,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="프로세스 창 중앙 이동 유틸리티")
     parser.add_argument("--headless", action="store_true", help="GUI 없이 실행")
     parser.add_argument("-p", "--pid", type=str, help="중앙으로 이동할 프로세스의 PID")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-w", "--window", type=int, help="중앙으로 이동할 창의 인덱스 (0부터 시작)")
+    group.add_argument("-f", "--first", action="store_true", help="첫 번째 창을 중앙으로 이동")
 
     args = parser.parse_args()
 
     if args.headless:
         if args.pid:
-            run_headless(args.pid)
+            run_headless(args.pid, args.window, args.first)
         else:
             print("오류: --headless 모드에서는 -p 또는 --pid 인자를 함께 제공해야 합니다.")
             sys.exit(1)
